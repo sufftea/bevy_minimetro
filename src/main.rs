@@ -2,7 +2,7 @@ use bevy::{prelude::*, reflect::hash_error};
 
 mod game;
 mod style;
-mod ui;
+mod main_menu;
 mod utils;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default, States)]
@@ -40,7 +40,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .init_state::<AppState>()
         .add_sub_state::<GameState>()
-        .add_plugins(ui::plugin)
+        .add_plugins(main_menu::plugin)
         .add_plugins(game::plugin)
         .run();
 }

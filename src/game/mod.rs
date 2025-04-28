@@ -11,6 +11,7 @@ use crate::AppState;
 use bevy::color::palettes::basic as colors;
 
 mod metro;
+mod ui;
 mod utils;
 
 #[derive(Resource)]
@@ -19,9 +20,8 @@ pub struct BestScore(pub u32);
 pub(super) fn plugin(app: &mut App) {
     app.insert_resource(BestScore(0))
         .insert_resource(Metro::new())
-        .add_systems(OnEnter(AppState::Game), setup_scene)
-        .add_systems(Update, scale_view);
-    // .add_systems(Update, on_update);
+        .add_systems(OnEnter(AppState::Game), (setup_scene, scale_view).chain())
+        .add_systems(Update, on_window_resized);
 }
 
 fn setup_scene(
@@ -32,9 +32,9 @@ fn setup_scene(
 ) {
     commands.spawn((
         Camera2d,
-        OrthographicProjection {
+        Projection::Orthographic(OrthographicProjection {
             ..OrthographicProjection::default_2d()
-        },
+        }),
     ));
 
     for station in &metro_res.stations {
@@ -98,28 +98,43 @@ fn setup_scene(
     ));
 }
 
-fn scale_view(
-    mut projection: Single<&mut OrthographicProjection, With<Camera2d>>,
+fn on_window_resized(
+    mut projection: Single<&mut Projection, With<Camera2d>>,
     // window: Single<&Window, With<PrimaryWindow>>,
     mut resize_reader: EventReader<WindowResized>,
 ) {
     for e in resize_reader.read() {
-        println!("resizing window:  {} / {}", e.width, MAP_SIZE.x);
-
         let scale_factor = if MAP_SIZE.x / MAP_SIZE.y > e.width / e.height {
             MAP_SIZE.x / e.width
         } else {
             MAP_SIZE.y / e.height
         };
 
-        // let scale_factor = e.width / MAP_SIZE.x;
-        projection.scale = scale_factor;
-
-        // projection.scaling_mode = ScalingMode::Fixed {
-        //     width: MAP_SIZE.x * scale_factor,
-        //     height: MAP_SIZE.y * scale_factor,
-        // };
+        **projection = Projection::Orthographic(OrthographicProjection {
+            scale: scale_factor,
+            ..OrthographicProjection::default_2d()
+        });
     }
 }
+
+fn scale_view(
+    mut projection: Single<&mut Projection, With<Camera2d>>,
+    window: Single<&Window, With<PrimaryWindow>>,
+) {
+    let window_size = window.size();
+
+    let scale_factor = if MAP_SIZE.x / MAP_SIZE.y > window_size.x / window_size.y {
+        MAP_SIZE.x / window_size.x
+    } else {
+        MAP_SIZE.y / window_size.y
+    };
+
+    **projection = Projection::Orthographic(OrthographicProjection {
+        scale: scale_factor,
+        ..OrthographicProjection::default_2d()
+    });
+}
+
+fn setup_ui(mut commands: Commands) {}
 
 fn on_update(commands: Commands) {}

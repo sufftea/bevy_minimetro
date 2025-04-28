@@ -32,7 +32,7 @@ fn setup_main_menu(mut commands: Commands, best_score: Res<crate::game::BestScor
             },
         ))
         .with_children(|parent| {
-            let button = parent
+            parent
                 .spawn((
                     Button,
                     Node {
@@ -71,6 +71,6 @@ fn clean_up_main_menu(
     main_menu_components_query: Query<Entity, With<MainMenuComponent>>,
 ) {
     for entity in main_menu_components_query.iter() {
-        commands.entity(entity).despawn_recursive();
+        commands.entity(entity).despawn();
     }
 }
