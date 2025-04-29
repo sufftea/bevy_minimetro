@@ -16,16 +16,14 @@ use super::{
 };
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(OnEnter(AppState::Game), (setup_ui, debug_shit).chain());
+    app.add_systems(OnEnter(AppState::Game), setup_ui);
+    // app.add_systems(OnEnter(AppState::Game), (setup_ui, debug_shit).chain());
 }
 
 #[derive(Component)]
 struct LineSlot {
     line_id: LineId,
 }
-
-#[derive(Component)]
-struct LineIndicator;
 
 fn setup_ui(
     mut commands: Commands,
@@ -51,7 +49,7 @@ fn setup_ui(
             let active_lines = metro.get_active_lines();
 
             for i in 0..metro_resources.max_lines {
-                let id = parent
+                parent
                     .spawn((
                         LineSlot { line_id: i },
                         Node {
@@ -66,12 +64,15 @@ fn setup_ui(
                     ))
                     .with_children(|parent| {
                         parent.spawn((
-                            Node::default(),
+                            Node {
+                                width: Val::Px(20.),
+                                height: Val::Px(20.),
+                                ..default()
+                            },
                             Mesh2d(meshes.add(Circle::new(20.))),
                             MeshMaterial2d(
                                 materials.add(ColorMaterial::from_color(LINE_COLORS[i])),
                             ),
-                            Text
                             Transform::from_translation(Vec3::ZERO),
                             // Transform::from_translation(station.position.extend(1.0)),
                         ));
@@ -122,33 +123,32 @@ fn setup_ui(
                         //         BorderRadius::all(Val::Px(10.)),
                         //     ));
                         // }
-                    })
-                    .id();
+                    });
             }
         });
 }
 
-fn debug_shit(world: &World, line_slot: Query<(Entity, &Children), With<LineSlot>>) {
-    if let Some((entity, children)) = line_slot.iter().next() {
-        let names = world.inspect_entity(entity).map(|iter| {
-            iter.for_each(|item| {
-                println!("{:?}", item);
-            })
-        });
-        //
-        println!("{:#?}", names);
-
-        // println!("=====  children: ======");
-
-        // for child in children {
-        //     let names = world
-        //         .inspect_entity(entity)
-        //         .map(|iter| iter.map(|item| item.fmt()).collect::<Vec<_>>());
-        //     //
-        //     println!("{:#?}", names);
-        // }
-        // world.inspect_entity(entity).unwrap().find(|item| item.)
-    } else {
-        println!("didn't find the entity")
-    }
-}
+// fn debug_shit(world: &World, line_slot: Query<(Entity, &Children), With<LineSlot>>) {
+//     if let Some((entity, children)) = line_slot.iter().next() {
+//         let names = world.inspect_entity(entity).map(|iter| {
+//             iter.for_each(|item| {
+//                 println!("{:?}", item);
+//             })
+//         });
+//         //
+//         println!("{:#?}", names);
+//
+//         // println!("=====  children: ======");
+//
+//         // for child in children {
+//         //     let names = world
+//         //         .inspect_entity(entity)
+//         //         .map(|iter| iter.map(|item| item.fmt()).collect::<Vec<_>>());
+//         //     //
+//         //     println!("{:#?}", names);
+//         // }
+//         // world.inspect_entity(entity).unwrap().find(|item| item.)
+//     } else {
+//         println!("didn't find the entity")
+//     }
+// }
