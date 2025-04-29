@@ -3,11 +3,25 @@ use std::f32::INFINITY;
 use rand::{Rng, rng};
 
 use bevy::{
+    color::Srgba,
     math::Vec2,
+    platform::collections::HashSet,
     prelude::{Deref, Resource},
 };
 
 pub const MAP_SIZE: Vec2 = Vec2::new(200., 200.);
+pub const LINE_COLORS: [Srgba; 10] = [
+    Srgba::new(0.4, 0.8, 0.9, 1.0), // soft cyan
+    Srgba::new(0.9, 0.6, 0.4, 1.0), // warm peach
+    Srgba::new(0.5, 0.4, 0.8, 1.0), // lavender
+    Srgba::new(0.7, 0.9, 0.4, 1.0), // limey green
+    Srgba::new(0.9, 0.4, 0.7, 1.0), // rose pink
+    Srgba::new(0.4, 0.9, 0.6, 1.0), // mint green
+    Srgba::new(0.8, 0.5, 0.4, 1.0), // muted coral
+    Srgba::new(0.4, 0.6, 0.9, 1.0), // soft blue
+    Srgba::new(0.9, 0.8, 0.4, 1.0), // mellow yellow
+    Srgba::new(0.6, 0.4, 0.9, 1.0), // soft violet
+];
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum StationKind {
@@ -73,6 +87,7 @@ pub struct Connection {
     target: StationId,
 }
 
+// TODO: maybe split this into multiple resources, so that bevy can parellelize access to them?
 #[derive(Resource)]
 pub struct Metro {
     pub stations: Vec<Station>,
@@ -80,7 +95,6 @@ pub struct Metro {
     /// which connects to it.
     pub connections: Vec<Vec<Connection>>,
     pub trains: Vec<Train>,
-    pub trains_available: usize,
 
     pub distances: Vec<Vec<f32>>,
 }
@@ -93,11 +107,23 @@ impl Metro {
                 Station::new(StationKind::Triangle, Vec2::new(20., -20.)),
                 Station::new(StationKind::Circle, Vec2::new(-20., 40.)),
             ],
-            trains_available: 3,
             connections: vec![Vec::new(); 3],
             trains: Vec::new(),
             distances: Vec::new(),
         }
+    }
+
+    pub fn get_active_lines(&self) -> HashSet<LineId> {
+        let mut lines = HashSet::<LineId>::new();
+
+        for station in &self.connections {
+            for line in station {
+                lines.insert(line.line_id);
+            }
+        }
+
+        lines.insert(0);
+        lines
     }
 
     pub fn add_connection(&mut self, a: StationId, b: StationId, line_id: LineId) -> bool {
@@ -238,19 +264,16 @@ impl Metro {
                     .passengers
                     .iter()
                     .position(|passenger| {
-                        let should_board = (0..self.distances[curr_station_id].len())
-                            .filter(|final_station_id_candidate| {
+                        (0..self.distances[curr_station_id].len())
+                            .find(|final_station_id_candidate| {
                                 self.stations[*final_station_id_candidate].kind == passenger.target
                             })
                             .map(|final_station_id| final_station_id as StationId)
                             .filter(|final_station_id| {
-                                return self.distances[curr_station_id][*final_station_id]
-                                    > self.distances[next_station.target][*final_station_id];
+                                self.distances[curr_station_id][*final_station_id]
+                                    > self.distances[next_station.target][*final_station_id]
                             })
-                            .next()
-                            .is_some();
-
-                        return should_board;
+                            .is_some()
                     });
 
                 if let Some(i) = next_passenger_to_board {
@@ -265,6 +288,23 @@ impl Metro {
 
                 return;
             }
+        }
+    }
+}
+
+#[derive(Resource)]
+pub struct MetroResources {
+    pub total_trains: usize,
+    pub lines: usize,
+    pub max_lines: usize,
+}
+
+impl MetroResources {
+    pub fn new() -> Self {
+        Self {
+            total_trains: 3,
+            lines: 3,
+            max_lines: 9,
         }
     }
 }

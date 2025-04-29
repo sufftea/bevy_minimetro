@@ -1,10 +1,8 @@
 use bevy::{
-    ecs::query::QueryFilter,
     prelude::*,
-    render::{camera::ScalingMode, view::window},
-    window::{PrimaryWindow, WindowResized, WindowResolution},
+    window::{PrimaryWindow, WindowResized},
 };
-use metro::{MAP_SIZE, Metro};
+use metro::{LineId, MAP_SIZE, Metro, MetroResources};
 use utils::STATION_MESHES;
 
 use crate::AppState;
@@ -17,9 +15,21 @@ mod utils;
 #[derive(Resource)]
 pub struct BestScore(pub u32);
 
+#[derive(Component)]
+pub struct GameComponent;
+
+#[derive(Event)]
+pub enum ActiveLinesChanged {
+    Added { line_id: LineId },
+    Removed { line_id: LineId },
+}
+
 pub(super) fn plugin(app: &mut App) {
-    app.insert_resource(BestScore(0))
+    app.add_plugins(ui::plugin)
+        .insert_resource(BestScore(0))
         .insert_resource(Metro::new())
+        .insert_resource(MetroResources::new())
+        .add_event::<ActiveLinesChanged>()
         .add_systems(OnEnter(AppState::Game), (setup_scene, scale_view).chain())
         .add_systems(Update, on_window_resized);
 }
@@ -31,6 +41,7 @@ fn setup_scene(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     commands.spawn((
+        GameComponent,
         Camera2d,
         Projection::Orthographic(OrthographicProjection {
             ..OrthographicProjection::default_2d()
@@ -45,11 +56,13 @@ fn setup_scene(
         match station.kind {
             metro::StationKind::Square => {
                 commands.spawn((
+                    GameComponent,
                     Mesh2d(meshes.add(STATION_MESHES.square())),
                     MeshMaterial2d(materials.add(Color::from(INNER_COLOR))),
                     Transform::from_translation(station.position.extend(1.0)),
                 ));
                 commands.spawn((
+                    GameComponent,
                     Mesh2d(meshes.add(STATION_MESHES.square())),
                     MeshMaterial2d(materials.add(Color::from(BORDER_COLOR))),
                     Transform::from_translation(station.position.extend(0.0))
@@ -58,6 +71,7 @@ fn setup_scene(
             }
             metro::StationKind::Triangle => {
                 commands.spawn((
+                    GameComponent,
                     Mesh2d(meshes.add(STATION_MESHES.triangle())),
                     MeshMaterial2d(materials.add(Color::from(INNER_COLOR))),
                     Transform::from_translation(station.position.extend(1.0)),
@@ -87,11 +101,13 @@ fn setup_scene(
         };
     }
     commands.spawn((
+        GameComponent,
         Mesh2d(meshes.add(Rectangle::new(200., 0.5))),
         MeshMaterial2d(materials.add(Color::from(colors::PURPLE))),
         Transform::from_xyz(0., 0., 0.),
     ));
     commands.spawn((
+        GameComponent,
         Mesh2d(meshes.add(Rectangle::new(0.5, 200.))),
         MeshMaterial2d(materials.add(Color::from(colors::PURPLE))),
         Transform::from_xyz(0., 0., 0.),
