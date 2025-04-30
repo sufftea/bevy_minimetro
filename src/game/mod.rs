@@ -1,4 +1,5 @@
 use bevy::{
+    math::VectorSpace,
     prelude::*,
     window::{PrimaryWindow, WindowResized},
 };
@@ -8,6 +9,7 @@ use utils::STATION_MESHES;
 use crate::AppState;
 use bevy::color::palettes::basic as colors;
 
+mod line_connector;
 mod metro;
 mod ui;
 mod utils;
@@ -21,15 +23,15 @@ pub struct GameComponent;
 #[derive(Event)]
 pub struct ActiveLinesChanged;
 
-
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(ui::plugin)
+        .add_plugins(line_connector::plugin)
         .insert_resource(BestScore(0))
         .insert_resource(Metro::new())
         .insert_resource(MetroResources::new())
         .add_event::<ActiveLinesChanged>()
         .add_systems(OnEnter(AppState::Game), (setup_scene, scale_view).chain())
-        .add_systems(Update, on_window_resized);
+        .add_systems(Update, scale_view.run_if(on_event::<WindowResized>));
 }
 
 fn setup_scene(
@@ -50,53 +52,34 @@ fn setup_scene(
         const BORDER_SCALE: f32 = 1.2;
         const INNER_COLOR: Srgba = colors::GRAY;
         const BORDER_COLOR: Srgba = colors::WHITE;
-        println!("drawing a station");
-        match station.kind {
-            metro::StationKind::Square => {
-                commands.spawn((
-                    GameComponent,
-                    Mesh2d(meshes.add(STATION_MESHES.square())),
-                    MeshMaterial2d(materials.add(Color::from(INNER_COLOR))),
-                    Transform::from_translation(station.position.extend(1.0)),
-                ));
-                commands.spawn((
-                    GameComponent,
-                    Mesh2d(meshes.add(STATION_MESHES.square())),
-                    MeshMaterial2d(materials.add(Color::from(BORDER_COLOR))),
-                    Transform::from_translation(station.position.extend(0.0))
-                        .with_scale(Vec3::ONE * BORDER_SCALE),
-                ));
-            }
-            metro::StationKind::Triangle => {
-                commands.spawn((
-                    GameComponent,
-                    Mesh2d(meshes.add(STATION_MESHES.triangle())),
-                    MeshMaterial2d(materials.add(Color::from(INNER_COLOR))),
-                    Transform::from_translation(station.position.extend(1.0)),
-                ));
 
-                commands.spawn((
-                    Mesh2d(meshes.add(STATION_MESHES.triangle())),
-                    MeshMaterial2d(materials.add(Color::from(BORDER_COLOR))),
-                    Transform::from_translation(station.position.extend(0.0))
-                        .with_scale(Vec3::ONE * BORDER_SCALE),
-                ));
-            }
-            metro::StationKind::Circle => {
-                commands.spawn((
-                    Mesh2d(meshes.add(STATION_MESHES.circle())),
+        commands.spawn((
+            GameComponent,
+            Mesh2d(meshes.add(STATION_MESHES.square())),
+            Transform::from_translation(station.position.extend(1.0)),
+            children![
+                (
+                    match station.kind {
+                        metro::StationKind::Square => Mesh2d(meshes.add(STATION_MESHES.square())),
+                        metro::StationKind::Triangle =>
+                            Mesh2d(meshes.add(STATION_MESHES.triangle())),
+                        metro::StationKind::Circle => Mesh2d(meshes.add(STATION_MESHES.circle())),
+                    },
                     MeshMaterial2d(materials.add(Color::from(INNER_COLOR))),
-                    Transform::from_translation(station.position.extend(1.0)),
-                ));
-
-                commands.spawn((
-                    Mesh2d(meshes.add(STATION_MESHES.circle())),
+                    Transform::from_translation(Vec3::new(0., 0., 1.)),
+                ),
+                (
+                    match station.kind {
+                        metro::StationKind::Square => Mesh2d(meshes.add(STATION_MESHES.square())),
+                        metro::StationKind::Triangle =>
+                            Mesh2d(meshes.add(STATION_MESHES.triangle())),
+                        metro::StationKind::Circle => Mesh2d(meshes.add(STATION_MESHES.circle())),
+                    },
                     MeshMaterial2d(materials.add(Color::from(BORDER_COLOR))),
-                    Transform::from_translation(station.position.extend(0.0))
-                        .with_scale(Vec3::ONE * BORDER_SCALE),
-                ));
-            }
-        };
+                    Transform::from_translation(Vec3::ZERO).with_scale(Vec3::ONE * BORDER_SCALE),
+                )
+            ],
+        ));
     }
     commands.spawn((
         GameComponent,
@@ -112,24 +95,6 @@ fn setup_scene(
     ));
 }
 
-fn on_window_resized(
-    mut projection: Single<&mut Projection, With<Camera2d>>,
-    // window: Single<&Window, With<PrimaryWindow>>,
-    mut resize_reader: EventReader<WindowResized>,
-) {
-    for e in resize_reader.read() {
-        let scale_factor = if MAP_SIZE.x / MAP_SIZE.y > e.width / e.height {
-            MAP_SIZE.x / e.width
-        } else {
-            MAP_SIZE.y / e.height
-        };
-
-        **projection = Projection::Orthographic(OrthographicProjection {
-            scale: scale_factor,
-            ..OrthographicProjection::default_2d()
-        });
-    }
-}
 
 fn scale_view(
     mut projection: Single<&mut Projection, With<Camera2d>>,
@@ -148,7 +113,3 @@ fn scale_view(
         ..OrthographicProjection::default_2d()
     });
 }
-
-fn setup_ui(mut commands: Commands) {}
-
-fn on_update(commands: Commands) {}

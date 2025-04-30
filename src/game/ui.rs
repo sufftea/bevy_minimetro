@@ -45,7 +45,7 @@ enum LineIndicatorState {
     Unavailable,
 }
 
-fn setup_ui(mut commands: Commands, ) {
+fn setup_ui(mut commands: Commands) {
     commands.spawn((
         Node {
             width: Val::Px(150.0),
@@ -104,53 +104,22 @@ fn build_line_indicators(
     };
 
     let active_lines = metro.get_active_lines();
-    let new_state = match metro_resources.lines {
-        5 => LineIndicatorsState {
-            line_states: vec![
-                LineIndicatorState::Active,
-                LineIndicatorState::Active,
-                LineIndicatorState::Active,
-                LineIndicatorState::Inactive,
-                LineIndicatorState::Unavailable,
-                LineIndicatorState::Unavailable,
-            ],
-        },
-        4 => LineIndicatorsState {
-            line_states: vec![
-                LineIndicatorState::Active,
-                LineIndicatorState::Active,
-                LineIndicatorState::Inactive,
-                LineIndicatorState::Inactive,
-                LineIndicatorState::Unavailable,
-                LineIndicatorState::Unavailable,
-            ],
-        },
-        _ => LineIndicatorsState {
-            line_states: vec![
-                LineIndicatorState::Active,
-                LineIndicatorState::Inactive,
-                LineIndicatorState::Inactive,
-                LineIndicatorState::Unavailable,
-                LineIndicatorState::Unavailable,
-                LineIndicatorState::Unavailable,
-            ],
-        },
+
+    let new_state = LineIndicatorsState {
+        line_states: (0..metro_resources.max_lines)
+            .map(|i| {
+                if i < metro_resources.lines {
+                    if active_lines.contains(&i) {
+                        LineIndicatorState::Active
+                    } else {
+                        LineIndicatorState::Inactive
+                    }
+                } else {
+                    LineIndicatorState::Unavailable
+                }
+            })
+            .collect(),
     };
-    // let new_state = LineIndicatorsState {
-    //     line_states: (0..metro_resources.max_lines)
-    //         .map(|i| {
-    //             if i < metro_resources.lines {
-    //                 if active_lines.contains(&i) {
-    //                     LineIndicatorState::Active
-    //                 } else {
-    //                     LineIndicatorState::Inactive
-    //                 }
-    //             } else {
-    //                 LineIndicatorState::Unavailable
-    //             }
-    //         })
-    //         .collect(),
-    // };
 
     commands
         .spawn((
@@ -272,59 +241,3 @@ impl Lens<Node> for NodeSizeLens {
     }
 }
 
-// fn on_line_state_change(
-//     mut commands: Commands,
-//     changes: Query<(&LineIndicatorSlot, &Node, Entity), Changed<LineIndicatorSlot>>,
-// ) {
-//     println!("on line state change");
-//     for (slot_data, node, entity) in changes {
-//         match slot_data.state {
-//             LineIndicatorState::Selected => todo!(),
-//             LineIndicatorState::Active => {
-//                 println!("adding the animator");
-//                 let curr_size = match node.width {
-//                     Val::Px(width) => width,
-//                     _ => LINE_INDICATOR_INACTIVE_SIZE,
-//                 };
-//
-//                 let tween = Tween::new(
-//                     EaseFunction::BounceOut,
-//                     Duration::from_secs(1),
-//                     NodeSizeLens {
-//                         start: curr_size,
-//                         end: LINE_INDICATOR_ACTIVE_SIZE,
-//                     },
-//                 );
-//
-//                 commands.entity(entity).insert(Animator::new(tween));
-//             }
-//             LineIndicatorState::Inactive => {}
-//             LineIndicatorState::Unavailable => {}
-//         };
-//     }
-// }
-
-// fn debug_shit(world: &World, line_slot: Query<(Entity, &Children), With<LineSlot>>) {
-//     if let Some((entity, children)) = line_slot.iter().next() {
-//         let names = world.inspect_entity(entity).map(|iter| {
-//             iter.for_each(|item| {
-//                 println!("{:?}", item);
-//             })
-//         });
-//         //
-//         println!("{:#?}", names);
-//
-//         // println!("=====  children: ======");
-//
-//         // for child in children {
-//         //     let names = world
-//         //         .inspect_entity(entity)
-//         //         .map(|iter| iter.map(|item| item.fmt()).collect::<Vec<_>>());
-//         //     //
-//         //     println!("{:#?}", names);
-//         // }
-//         // world.inspect_entity(entity).unwrap().find(|item| item.)
-//     } else {
-//         println!("didn't find the entity")
-//     }
-// }
