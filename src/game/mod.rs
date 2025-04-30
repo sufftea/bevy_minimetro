@@ -19,10 +19,8 @@ pub struct BestScore(pub u32);
 pub struct GameComponent;
 
 #[derive(Event)]
-pub enum ActiveLinesChanged {
-    Added { line_id: LineId },
-    Removed { line_id: LineId },
-}
+pub struct ActiveLinesChanged;
+
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(ui::plugin)

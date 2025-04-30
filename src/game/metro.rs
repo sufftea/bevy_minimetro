@@ -122,7 +122,7 @@ impl Metro {
             }
         }
 
-        lines.insert(0);
+        // lines.insert(0);
         lines
     }
 

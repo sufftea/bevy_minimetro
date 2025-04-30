@@ -1,8 +1,9 @@
 use bevy::{prelude::*, reflect::hash_error};
+use bevy_tweening::TweeningPlugin;
 
 mod game;
-mod style;
 mod main_menu;
+mod style;
 mod utils;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Default, States)]
@@ -37,6 +38,7 @@ enum GameState {
 
 fn main() {
     App::new()
+        .add_plugins(TweeningPlugin)
         .add_plugins(DefaultPlugins)
         .init_state::<AppState>()
         .add_sub_state::<GameState>()
