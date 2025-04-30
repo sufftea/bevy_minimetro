@@ -1,4 +1,8 @@
-use bevy::{ecs::spawn::SpawnWith, log::tracing_subscriber::fmt::format, prelude::*};
+use std::time::Duration;
+
+use bevy::{
+    ecs::spawn::SpawnWith, log::tracing_subscriber::fmt::format, math::VectorSpace, prelude::*,
+};
 use bevy_tweening::{AnimationSystem, Animator, Lens, Tween, component_animator_system};
 
 use crate::{AppState, style};
@@ -13,9 +17,12 @@ const LINE_INDICATOR_ACTIVE_SIZE: f32 = 50.;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(OnEnter(AppState::Game), setup_ui)
+        .add_systems(OnEnter(AppState::Game), build_line_indicators)
         .add_systems(
             Update,
-            build_line_indicators.run_if(in_state(AppState::Game)),
+            build_line_indicators
+                .run_if(in_state(AppState::Game))
+                .run_if(on_event::<ActiveLinesChanged>),
         )
         .add_systems(
             Update,
@@ -38,7 +45,7 @@ enum LineIndicatorState {
     Unavailable,
 }
 
-fn setup_ui(mut commands: Commands) {
+fn setup_ui(mut commands: Commands, ) {
     commands.spawn((
         Node {
             width: Val::Px(150.0),
@@ -72,7 +79,7 @@ fn setup_ui(mut commands: Commands) {
                     |_: Trigger<Pointer<Click>>,
                      mut events: EventWriter<ActiveLinesChanged>,
                      mut metro_resources: ResMut<MetroResources>| {
-                        println!("button clicked");
+                        println!("button clicked. metro lines: {}", metro_resources.lines);
                         metro_resources.lines += 1;
                         events.write(ActiveLinesChanged);
                     },
@@ -82,19 +89,11 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn build_line_indicators(
-    mut events: EventReader<ActiveLinesChanged>,
     mut commands: Commands,
     metro_resources: Res<MetroResources>,
     metro: Res<Metro>,
     old_tree_q: Query<(Entity, &LineIndicatorsState)>,
 ) {
-    println!("build line indicators");
-    if events.read().next().is_none() {
-        println!("event is none");
-        return;
-    }
-    println!("rebuilding line indicators");
-
     let old_state = if let Some((old_entity, old_state)) = old_tree_q.iter().next() {
         commands.entity(old_entity).despawn();
         old_state.clone()
@@ -105,25 +104,58 @@ fn build_line_indicators(
     };
 
     let active_lines = metro.get_active_lines();
-    let new_state = LineIndicatorsState {
-        line_states: (0..metro_resources.max_lines)
-            .map(|i| {
-                if i < metro_resources.lines {
-                    if active_lines.contains(&i) {
-                        LineIndicatorState::Active
-                    } else {
-                        LineIndicatorState::Inactive
-                    }
-                } else {
-                    LineIndicatorState::Unavailable
-                }
-            })
-            .collect(),
+    let new_state = match metro_resources.lines {
+        5 => LineIndicatorsState {
+            line_states: vec![
+                LineIndicatorState::Active,
+                LineIndicatorState::Active,
+                LineIndicatorState::Active,
+                LineIndicatorState::Inactive,
+                LineIndicatorState::Unavailable,
+                LineIndicatorState::Unavailable,
+            ],
+        },
+        4 => LineIndicatorsState {
+            line_states: vec![
+                LineIndicatorState::Active,
+                LineIndicatorState::Active,
+                LineIndicatorState::Inactive,
+                LineIndicatorState::Inactive,
+                LineIndicatorState::Unavailable,
+                LineIndicatorState::Unavailable,
+            ],
+        },
+        _ => LineIndicatorsState {
+            line_states: vec![
+                LineIndicatorState::Active,
+                LineIndicatorState::Inactive,
+                LineIndicatorState::Inactive,
+                LineIndicatorState::Unavailable,
+                LineIndicatorState::Unavailable,
+                LineIndicatorState::Unavailable,
+            ],
+        },
     };
+    // let new_state = LineIndicatorsState {
+    //     line_states: (0..metro_resources.max_lines)
+    //         .map(|i| {
+    //             if i < metro_resources.lines {
+    //                 if active_lines.contains(&i) {
+    //                     LineIndicatorState::Active
+    //                 } else {
+    //                     LineIndicatorState::Inactive
+    //                 }
+    //             } else {
+    //                 LineIndicatorState::Unavailable
+    //             }
+    //         })
+    //         .collect(),
+    // };
 
     commands
         .spawn((
             GameComponent,
+            new_state.clone(),
             Node {
                 justify_self: JustifySelf::End,
                 align_self: AlignSelf::Center,
@@ -152,39 +184,71 @@ fn build_line_indicators(
                         match new_state {
                             LineIndicatorState::Selected => todo!(),
 
-                            LineIndicatorState::Active => parent.spawn((
-                                Node {
-                                    justify_self: JustifySelf::Center,
-                                    align_self: AlignSelf::Center,
-                                    width: Val::Px(LINE_INDICATOR_ACTIVE_SIZE),
-                                    height: Val::Px(LINE_INDICATOR_ACTIVE_SIZE),
-                                    border: UiRect::all(Val::Px(5.)),
-                                    ..default()
-                                },
-                                BackgroundColor(LINE_COLORS[i].into()),
-                                BorderColor(style::ON_BACKGROUND.into()),
-                                BorderRadius::all(Val::Px(LINE_INDICATOR_ACTIVE_SIZE / 2.)),
-                            )),
-                            LineIndicatorState::Inactive => parent.spawn((
-                                Node {
-                                    justify_self: JustifySelf::Center,
-                                    align_self: AlignSelf::Center,
-                                    width: Val::Px(LINE_INDICATOR_INACTIVE_SIZE),
-                                    height: Val::Px(LINE_INDICATOR_INACTIVE_SIZE),
-                                    // border: UiRect::all(Val::Px(3.)),
-                                    ..default()
-                                },
-                                BackgroundColor(LINE_COLORS[i].into()),
-                                // BorderColor(style::ON_BACKGROUND.into()),
-                                BorderRadius::all(Val::Px(LINE_INDICATOR_INACTIVE_SIZE) / 2.),
-                            )),
+                            LineIndicatorState::Active => {
+                                let tween = Tween::new(
+                                    EaseFunction::BounceOut,
+                                    Duration::from_millis(400),
+                                    NodeSizeLens {
+                                        start: match old_state {
+                                            LineIndicatorState::Active => {
+                                                LINE_INDICATOR_ACTIVE_SIZE
+                                            }
+                                            _ => LINE_INDICATOR_INACTIVE_SIZE,
+                                        },
+                                        end: LINE_INDICATOR_ACTIVE_SIZE,
+                                    },
+                                );
+
+                                parent.spawn((
+                                    Node {
+                                        justify_self: JustifySelf::Center,
+                                        align_self: AlignSelf::Center,
+                                        width: Val::Px(LINE_INDICATOR_ACTIVE_SIZE),
+                                        height: Val::Px(LINE_INDICATOR_ACTIVE_SIZE),
+                                        border: UiRect::all(Val::Px(5.)),
+                                        ..default()
+                                    },
+                                    Animator::new(tween),
+                                    BackgroundColor(LINE_COLORS[i].into()),
+                                    BorderColor(style::ON_BACKGROUND.into()),
+                                    BorderRadius::all(Val::Px(LINE_INDICATOR_ACTIVE_SIZE / 2.)),
+                                ))
+                            }
+                            LineIndicatorState::Inactive => {
+                                let tween = Tween::new(
+                                    EaseFunction::BounceOut,
+                                    Duration::from_millis(400),
+                                    NodeSizeLens {
+                                        start: match old_state {
+                                            LineIndicatorState::Active => {
+                                                LINE_INDICATOR_ACTIVE_SIZE
+                                            }
+                                            _ => LINE_INDICATOR_INACTIVE_SIZE,
+                                        },
+                                        end: LINE_INDICATOR_INACTIVE_SIZE,
+                                    },
+                                );
+                                parent.spawn((
+                                    Node {
+                                        justify_self: JustifySelf::Center,
+                                        align_self: AlignSelf::Center,
+                                        width: Val::Px(LINE_INDICATOR_INACTIVE_SIZE),
+                                        height: Val::Px(LINE_INDICATOR_INACTIVE_SIZE),
+                                        // border: UiRect::all(Val::Px(3.)),
+                                        ..default()
+                                    },
+                                    Animator::new(tween),
+                                    BackgroundColor(LINE_COLORS[i].into()),
+                                    // BorderColor(style::ON_BACKGROUND.into()),
+                                    BorderRadius::all(Val::Px(LINE_INDICATOR_ACTIVE_SIZE) / 2.),
+                                ))
+                            }
                             LineIndicatorState::Unavailable => parent.spawn((
                                 Node {
                                     justify_self: JustifySelf::Center,
                                     align_self: AlignSelf::Center,
                                     width: Val::Px(LINE_INDICATOR_INACTIVE_SIZE),
                                     height: Val::Px(LINE_INDICATOR_INACTIVE_SIZE),
-                                    border: UiRect::all(Val::Px(3.)),
                                     ..default()
                                 },
                                 BackgroundColor(style::ON_BACKGROUND.into()),
@@ -203,8 +267,8 @@ struct NodeSizeLens {
 
 impl Lens<Node> for NodeSizeLens {
     fn lerp(&mut self, target: &mut dyn bevy_tweening::Targetable<Node>, ratio: f32) {
-        target.width = Val::Px((self.end - self.start) * ratio);
-        target.height = Val::Px((self.end - self.start) * ratio);
+        target.width = Val::Px(FloatExt::lerp(self.start, self.end, ratio));
+        target.height = Val::Px(FloatExt::lerp(self.start, self.end, ratio));
     }
 }
 
