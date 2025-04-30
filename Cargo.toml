@@ -8,3 +8,6 @@ bevy = { version = "0.16.0", features = [] }
 bevy_tweening = "0.13.0"
 cgmath = "0.18.0"
 rand = "0.9.1"
+
+[features]
+wayland = ["bevy/wayland"]
