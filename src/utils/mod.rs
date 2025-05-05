@@ -1,3 +1,5 @@
-use bevy::prelude::{Event, EventReader, Triangle2d};
+use bevy::prelude::*;
 
+use bevy::prelude::*;
 
+pub mod line_2d_plugin;

@@ -1,4 +1,10 @@
+#![allow(clippy::too_many_arguments)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
+
 use bevy::{prelude::*, reflect::hash_error};
+use bevy_2d_line::LineRenderingPlugin;
 use bevy_tweening::TweeningPlugin;
 
 mod game;
@@ -40,9 +46,11 @@ fn main() {
     App::new()
         .add_plugins(TweeningPlugin)
         .add_plugins(DefaultPlugins)
+        .add_plugins(MeshPickingPlugin)
         .init_state::<AppState>()
         .add_sub_state::<GameState>()
         .add_plugins(main_menu::plugin)
         .add_plugins(game::plugin)
+        .add_plugins(utils::line_2d_plugin::plugin)
         .run();
 }

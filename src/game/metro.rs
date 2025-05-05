@@ -35,6 +35,7 @@ pub struct Passenger {
     pub target: StationKind,
 }
 
+#[derive(Clone)]
 pub struct Station {
     pub passengers: Vec<Passenger>,
     pub kind: StationKind,
@@ -295,7 +296,7 @@ impl Metro {
 #[derive(Resource)]
 pub struct MetroResources {
     pub total_trains: usize,
-    pub lines: usize,
+    pub available_lines: usize,
     pub max_lines: usize,
 }
 
@@ -303,7 +304,7 @@ impl MetroResources {
     pub fn new() -> Self {
         Self {
             total_trains: 3,
-            lines: 3,
+            available_lines: 3,
             max_lines: 9,
         }
     }

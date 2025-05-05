@@ -3,19 +3,25 @@ use bevy::{
     prelude::*,
     window::{PrimaryWindow, WindowResized},
 };
-use metro::{LineId, MAP_SIZE, Metro, MetroResources};
+use line_connection::{StationLineDragTarget, LineDragHandle};
+use metro::{LineId, MAP_SIZE, Metro, MetroResources, StationId};
 use utils::STATION_MESHES;
 
 use crate::AppState;
 use bevy::color::palettes::basic as colors;
 
-mod line_connector;
-mod metro;
-mod ui;
-mod utils;
+pub mod line_connection;
+pub mod metro;
+pub mod ui;
+pub mod utils;
 
 #[derive(Resource)]
 pub struct BestScore(pub u32);
+
+// #[derive(Component)]
+// pub struct StationEntityData {
+//     station_id: StationId,
+// }
 
 #[derive(Component)]
 pub struct GameComponent;
@@ -24,8 +30,8 @@ pub struct GameComponent;
 pub struct ActiveLinesChanged;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_plugins(ui::plugin)
-        .add_plugins(line_connector::plugin)
+    app.add_plugins(line_connection::plugin)
+        .add_plugins(ui::plugin)
         .insert_resource(BestScore(0))
         .insert_resource(Metro::new())
         .insert_resource(MetroResources::new())
@@ -36,7 +42,7 @@ pub(super) fn plugin(app: &mut App) {
 
 fn setup_scene(
     mut commands: Commands,
-    metro_res: Res<Metro>,
+    metro: Res<Metro>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -48,13 +54,16 @@ fn setup_scene(
         }),
     ));
 
-    for station in &metro_res.stations {
+    for (station_id, station) in metro.stations.iter().enumerate() {
         const BORDER_SCALE: f32 = 1.2;
         const INNER_COLOR: Srgba = colors::GRAY;
         const BORDER_COLOR: Srgba = colors::WHITE;
 
         commands.spawn((
             GameComponent,
+            // StationEntityData { station_id: i },
+            LineDragHandle::New { station_id },
+            StationLineDragTarget { station_id },
             Mesh2d(meshes.add(STATION_MESHES.square())),
             Transform::from_translation(station.position.extend(1.0)),
             children![
@@ -94,7 +103,6 @@ fn setup_scene(
         Transform::from_xyz(0., 0., 0.),
     ));
 }
-
 
 fn scale_view(
     mut projection: Single<&mut Projection, With<Camera2d>>,

@@ -15,7 +15,7 @@ use super::{
 const LINE_INDICATOR_INACTIVE_SIZE: f32 = 20.;
 const LINE_INDICATOR_ACTIVE_SIZE: f32 = 50.;
 
-pub(super) fn plugin(app: &mut App) {
+pub fn plugin(app: &mut App) {
     app.add_systems(OnEnter(AppState::Game), setup_ui)
         .add_systems(OnEnter(AppState::Game), build_line_indicators)
         .add_systems(
@@ -79,8 +79,11 @@ fn setup_ui(mut commands: Commands) {
                     |_: Trigger<Pointer<Click>>,
                      mut events: EventWriter<ActiveLinesChanged>,
                      mut metro_resources: ResMut<MetroResources>| {
-                        println!("button clicked. metro lines: {}", metro_resources.lines);
-                        metro_resources.lines += 1;
+                        println!(
+                            "button clicked. metro lines: {}",
+                            metro_resources.available_lines
+                        );
+                        metro_resources.available_lines += 1;
                         events.write(ActiveLinesChanged);
                     },
                 );
@@ -108,7 +111,7 @@ fn build_line_indicators(
     let new_state = LineIndicatorsState {
         line_states: (0..metro_resources.max_lines)
             .map(|i| {
-                if i < metro_resources.lines {
+                if i < metro_resources.available_lines {
                     if active_lines.contains(&i) {
                         LineIndicatorState::Active
                     } else {
@@ -240,4 +243,3 @@ impl Lens<Node> for NodeSizeLens {
         target.height = Val::Px(FloatExt::lerp(self.start, self.end, ratio));
     }
 }
-
