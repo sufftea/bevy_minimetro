@@ -136,9 +136,6 @@ fn on_drag_start(
                 ))
                 .id();
 
-
-
-
             *line_drag_state = LineDragState::New {
                 path: vec![PathNode {
                     station_id: *station_id,
@@ -212,6 +209,8 @@ fn on_drag(
                 panic!("something weird");
             };
 
+            lsat_line_2d_data.end = drag_position;
+
             if let Some(intersecting_station) = intersecting_station {
                 if !*station_intersection_handled {
                     if intersecting_station.station_id == last_line_node.station_id {
@@ -222,6 +221,24 @@ fn on_drag(
                             path.pop();
                         }
                     } else {
+                        if path.len() > 2
+                            && intersecting_station.station_id == path.first().unwrap().station_id
+                        {
+                            // TODO: loop the path
+                            println!("todo: loop the path");
+
+                            *station_intersection_handled = true;
+                            return;
+                        }
+
+                        // Check if we're trying to create an impossible loop.
+                        if path
+                            .iter()
+                            .any(|node| node.station_id == intersecting_station.station_id)
+                        {
+                            return;
+                        };
+
                         let station = &metro.stations[intersecting_station.station_id];
 
                         println!("inside a station");
@@ -255,9 +272,7 @@ fn on_drag(
                 }
             } else {
                 *station_intersection_handled = false;
-
-                lsat_line_2d_data.end = drag_position;
-            }
+            };
         }
         LineDragState::Extend {
             path: connections,

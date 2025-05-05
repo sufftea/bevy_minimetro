@@ -71,14 +71,14 @@ pub struct Train {
 
 impl Train {
     pub fn new(last_station: StationId, next_station: StationId) -> Self {
-        return Train {
+        Train {
             passengers: Vec::new(),
             locomotive_count: 1,
             last_station,
             next_station,
             traveled_distance: 0.0,
             stopped: true,
-        };
+        }
     }
 }
 
@@ -114,6 +114,8 @@ impl Metro {
         }
     }
 
+    
+
     pub fn get_active_lines(&self) -> HashSet<LineId> {
         let mut lines = HashSet::<LineId>::new();
 
@@ -128,8 +130,14 @@ impl Metro {
     }
 
     pub fn add_connection(&mut self, a: StationId, b: StationId, line_id: LineId) -> bool {
-        let connection_a = Connection { line_id, target: b };
-        let connection_b = Connection { line_id, target: a };
+        let connection_a = Connection {
+            line_id,
+            target: b,
+        };
+        let connection_b = Connection {
+            line_id,
+            target: a,
+        };
 
         if self.connections[a].contains(&connection_a)
             || self.connections[b].contains(&connection_b)
@@ -143,7 +151,7 @@ impl Metro {
         // TODO: not sure if this should be here?
         self.calculate_distances();
 
-        return true;
+        true
     }
 
     pub fn spawn_random_station(&mut self) {
