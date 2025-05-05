@@ -3,14 +3,14 @@ use bevy::{
     prelude::*,
     window::{PrimaryWindow, WindowResized},
 };
-use line_connection::{StationLineDragTarget, LineDragHandle};
+use lines::{StationLineDragTarget, LineDragHandle};
 use metro::{LineId, MAP_SIZE, Metro, MetroResources, StationId};
 use utils::STATION_MESHES;
 
 use crate::AppState;
 use bevy::color::palettes::basic as colors;
 
-pub mod line_connection;
+pub mod lines;
 pub mod metro;
 pub mod ui;
 pub mod utils;
@@ -30,7 +30,7 @@ pub struct GameComponent;
 pub struct ActiveLinesChanged;
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_plugins(line_connection::plugin)
+    app.add_plugins(lines::plugin)
         .add_plugins(ui::plugin)
         .insert_resource(BestScore(0))
         .insert_resource(Metro::new())

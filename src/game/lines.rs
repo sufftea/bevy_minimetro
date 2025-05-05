@@ -6,6 +6,8 @@ use crate::utils::line_2d_plugin::*;
 
 use super::metro::{Connection, LINE_COLORS, LineId, Metro, MetroResources, Station, StationId};
 
+const LINE_WIDTH: f32 = 2.;
+
 pub(super) fn plugin(app: &mut App) {
     app.add_observer(on_line_handle_spawned)
         .insert_resource(LineDragState::None);
@@ -34,7 +36,8 @@ pub enum LineDragState {
 }
 
 pub struct PathNode {
-    station_id: StationId,
+    start_station_id: StationId,
+    end_station_id: Option<StationId>,
     line_entity: Entity,
 }
 
@@ -125,7 +128,7 @@ fn on_drag_start(
                     Line2dBundle::new(
                         station.position,
                         drag_position,
-                        5.,
+                        LINE_WIDTH,
                         LINE_COLORS[new_line_id].into(),
                     ),
                     MetroLine {
@@ -138,7 +141,8 @@ fn on_drag_start(
 
             *line_drag_state = LineDragState::New {
                 path: vec![PathNode {
-                    station_id: *station_id,
+                    start_station_id: *station_id,
+                    end_station_id: None,
                     line_entity: new_line_entity,
                 }],
                 line_id: new_line_id,
@@ -213,16 +217,20 @@ fn on_drag(
 
             if let Some(intersecting_station) = intersecting_station {
                 if !*station_intersection_handled {
-                    if intersecting_station.station_id == last_line_node.station_id {
+                    if intersecting_station.station_id == last_line_node.start_station_id {
                         println!("i should detach the line from the station here");
 
                         if path.len() > 1 {
                             commands.entity(last_line_node.line_entity).despawn();
                             path.pop();
+                            if let Some(last_node) = path.last_mut() {
+                                last_node.end_station_id = None;
+                            }
                         }
                     } else {
                         if path.len() > 2
-                            && intersecting_station.station_id == path.first().unwrap().station_id
+                            && intersecting_station.station_id
+                                == path.first().unwrap().start_station_id
                         {
                             // TODO: loop the path
                             println!("todo: loop the path");
@@ -234,14 +242,16 @@ fn on_drag(
                         // Check if we're trying to create an impossible loop.
                         if path
                             .iter()
-                            .any(|node| node.station_id == intersecting_station.station_id)
+                            .any(|node| node.start_station_id == intersecting_station.station_id)
                         {
                             return;
                         };
 
-                        let station = &metro.stations[intersecting_station.station_id];
+                        if let Some(last_node) = path.last_mut() {
+                            last_node.end_station_id = Some(intersecting_station.station_id);
+                        }
 
-                        println!("inside a station");
+                        let station = &metro.stations[intersecting_station.station_id];
 
                         lsat_line_2d_data.end = station.position;
                         last_line_dragging.end_station_id = Some(intersecting_station.station_id);
@@ -251,7 +261,7 @@ fn on_drag(
                                 Line2dBundle::new(
                                     station.position,
                                     drag_position,
-                                    5.,
+                                    LINE_WIDTH,
                                     LINE_COLORS[*line_id].into(),
                                 ),
                                 MetroLine {
@@ -263,7 +273,8 @@ fn on_drag(
                             .id();
 
                         path.push(PathNode {
-                            station_id: intersecting_station.station_id,
+                            start_station_id: intersecting_station.station_id,
+                            end_station_id: None,
                             line_entity: new_line_entity,
                         });
                     }
@@ -289,13 +300,42 @@ fn on_drag(
 fn on_drag_end(
     trigger: Trigger<Pointer<DragEnd>>,
     mut commands: Commands,
-    mut drag_data_q: Query<(&mut MetroLine, &mut Line2dData)>,
+    drag_data_q: Query<(Entity, &mut MetroLine, &mut Line2dData)>,
 
     camera_transform_q: Single<(&Camera, &GlobalTransform)>,
-    drag_state_q: Res<LineDragState>,
-    metro: Res<Metro>,
+    mut drag_state: ResMut<LineDragState>,
+    mut metro: ResMut<Metro>,
     metro_resources: Res<MetroResources>,
 ) {
+    match &mut *drag_state {
+        LineDragState::None => {}
+        LineDragState::New { path, line_id } => {
+            let Some(last_node) = path.last() else {
+                return;
+            };
+
+            if let Ok((entity, metro_line, _)) = drag_data_q.get(last_node.line_entity) {
+                if metro_line.end_station_id.is_none() {
+                    commands.entity(entity).despawn();
+                }
+                path.pop();
+            }
+
+            for path_node in path {
+                let Some(end_station_id) = path_node.end_station_id else {
+                    continue;
+                };
+
+                metro.add_connection(path_node.start_station_id, end_station_id, *line_id);
+            }
+        }
+        LineDragState::Extend { path, line_id } => todo!(),
+        LineDragState::Edit {
+            line_id,
+            path,
+            stations,
+        } => todo!(),
+    }
 }
 
 // impl LineHandle {

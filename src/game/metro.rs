@@ -85,7 +85,7 @@ impl Train {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Connection {
     line_id: LineId,
-    target: StationId,
+    // target: StationId,
 }
 
 // TODO: maybe split this into multiple resources, so that bevy can parellelize access to them?
@@ -94,7 +94,7 @@ pub struct Metro {
     pub stations: Vec<Station>,
     /// [Starting station id] = The ids of all the stations it has a direct connection to + id of the line
     /// which connects to it.
-    pub connections: Vec<Vec<Connection>>,
+    pub connections: Vec<Vec<Vec<Connection>>>,
     pub trains: Vec<Train>,
 
     pub distances: Vec<Vec<f32>>,
@@ -108,50 +108,53 @@ impl Metro {
                 Station::new(StationKind::Triangle, Vec2::new(20., -20.)),
                 Station::new(StationKind::Circle, Vec2::new(-20., 40.)),
             ],
-            connections: vec![Vec::new(); 3],
+            connections: vec![vec![Vec::new(); 3]; 3],
             trains: Vec::new(),
             distances: Vec::new(),
         }
     }
 
-    
-
     pub fn get_active_lines(&self) -> HashSet<LineId> {
         let mut lines = HashSet::<LineId>::new();
 
-        for station in &self.connections {
-            for line in station {
-                lines.insert(line.line_id);
-            }
+        for connection in self.connections.iter().flatten().flatten() {
+            lines.insert(connection.line_id);
         }
 
         // lines.insert(0);
         lines
     }
 
-    pub fn add_connection(&mut self, a: StationId, b: StationId, line_id: LineId) -> bool {
-        let connection_a = Connection {
-            line_id,
-            target: b,
-        };
-        let connection_b = Connection {
-            line_id,
-            target: a,
-        };
-
-        if self.connections[a].contains(&connection_a)
-            || self.connections[b].contains(&connection_b)
+    pub fn add_connection(&mut self, a: StationId, b: StationId, line_id: LineId) {
+        if self.connections[a][b]
+            .iter()
+            .any(|connection| connection.line_id == line_id)
         {
-            return false;
+            return;
         }
 
-        self.connections[a].push(connection_a);
-        self.connections[b].push(connection_b);
+        self.connections[a][b].push(Connection { line_id });
 
-        // TODO: not sure if this should be here?
         self.calculate_distances();
 
-        true
+        // self.connections[a][b] = Some();
+
+        // let connection_a = Connection { line_id };
+        // let connection_b = Connection { line_id };
+        //
+        // if self.connections[a].contains(&connection_a)
+        //     || self.connections[b].contains(&connection_b)
+        // {
+        //     return false;
+        // }
+        //
+        // self.connections[a].push(connection_a);
+        // self.connections[b].push(connection_b);
+        //
+        // // TODO: not sure if this should be here?
+        // self.calculate_distances();
+        //
+        // true
     }
 
     pub fn spawn_random_station(&mut self) {
@@ -194,22 +197,23 @@ impl Metro {
     fn calculate_distances(&mut self) {
         // Floyd-Warshal algorithm
         let station_count = self.stations.len();
-        self.distances = vec![vec![INFINITY; station_count]; station_count];
+        self.distances = vec![vec![f32::INFINITY; station_count]; station_count];
 
         for (i, connections) in self.connections.iter().enumerate() {
-            for connection in connections.iter() {
+            for (j, connection) in connections.iter().enumerate() {
                 let from_station = &self.stations[i];
-                let to_station = &self.stations[connection.target];
+                let to_station = &self.stations[j];
 
-                self.distances[i][connection.target] =
-                    from_station.position.distance(to_station.position);
+                self.distances[i][j] = from_station.position.distance(to_station.position);
             }
         }
 
         for k in 0..station_count {
             for i in 0..station_count {
                 for j in 0..station_count {
-                    if self.distances[k][i] != INFINITY && self.distances[k][j] != INFINITY {
+                    if self.distances[k][i] != f32::INFINITY
+                        && self.distances[k][j] != f32::INFINITY
+                    {
                         self.distances[i][j] = f32::min(
                             self.distances[i][j],
                             self.distances[k][i] + self.distances[k][j],
@@ -243,62 +247,62 @@ impl Metro {
     // a delay (For gameplay purposes) until all the necessary passengers have settled.
     // If there are no passengers left to onboard, updates the train to indicate that it should
     // start moving.
-    pub fn onboard_passengers(&mut self) {
-        for train in &mut self.trains {
-            if train.stopped {
-                let curr_station_id = train.next_station;
-
-                let next_station_candidates = self.connections[train.next_station]
-                    .iter()
-                    .filter(|connection| connection.line_id == curr_station_id)
-                    .collect::<Vec<&Connection>>();
-
-                let next_station = match next_station_candidates[..] {
-                    // --(a)----(curr)-|
-                    // The train arrived at the end of the line and should turn around.
-                    [a] => a,
-                    // --(a)----(curr)----(b)--
-                    // There's another station ahead of the train.
-                    [a, b] => {
-                        if a.target == train.last_station {
-                            b
-                        } else {
-                            a
-                        }
-                    }
-                    _ => panic!("A single line shouldn't branch into multiple directinos."),
-                };
-
-                let next_passenger_to_board = self.stations[curr_station_id]
-                    .passengers
-                    .iter()
-                    .position(|passenger| {
-                        (0..self.distances[curr_station_id].len())
-                            .find(|final_station_id_candidate| {
-                                self.stations[*final_station_id_candidate].kind == passenger.target
-                            })
-                            .map(|final_station_id| final_station_id as StationId)
-                            .filter(|final_station_id| {
-                                self.distances[curr_station_id][*final_station_id]
-                                    > self.distances[next_station.target][*final_station_id]
-                            })
-                            .is_some()
-                    });
-
-                if let Some(i) = next_passenger_to_board {
-                    let passenger = self.stations[curr_station_id].passengers.remove(i);
-
-                    train.passengers.push(passenger);
-                } else {
-                    train.stopped = false;
-                    train.next_station = next_station.target;
-                    train.last_station = curr_station_id;
-                }
-
-                return;
-            }
-        }
-    }
+    // pub fn onboard_passengers(&mut self) {
+    //     for train in &mut self.trains {
+    //         if train.stopped {
+    //             let curr_station_id = train.next_station;
+    //
+    //             let next_station_candidates = self.connections[train.next_station]
+    //                 .iter()
+    //                 .filter(|connection| connection.line_id == curr_station_id)
+    //                 .collect::<Vec<&Connection>>();
+    //
+    //             let next_station = match next_station_candidates[..] {
+    //                 // --(a)----(curr)-|
+    //                 // The train arrived at the end of the line and should turn around.
+    //                 [a] => a,
+    //                 // --(a)----(curr)----(b)--
+    //                 // There's another station ahead of the train.
+    //                 [a, b] => {
+    //                     if a.target == train.last_station {
+    //                         b
+    //                     } else {
+    //                         a
+    //                     }
+    //                 }
+    //                 _ => panic!("A single line shouldn't branch into multiple directinos."),
+    //             };
+    //
+    //             let next_passenger_to_board = self.stations[curr_station_id]
+    //                 .passengers
+    //                 .iter()
+    //                 .position(|passenger| {
+    //                     (0..self.distances[curr_station_id].len())
+    //                         .find(|final_station_id_candidate| {
+    //                             self.stations[*final_station_id_candidate].kind == passenger.target
+    //                         })
+    //                         .map(|final_station_id| final_station_id as StationId)
+    //                         .filter(|final_station_id| {
+    //                             self.distances[curr_station_id][*final_station_id]
+    //                                 > self.distances[next_station.target][*final_station_id]
+    //                         })
+    //                         .is_some()
+    //                 });
+    //
+    //             if let Some(i) = next_passenger_to_board {
+    //                 let passenger = self.stations[curr_station_id].passengers.remove(i);
+    //
+    //                 train.passengers.push(passenger);
+    //             } else {
+    //                 train.stopped = false;
+    //                 train.next_station = next_station.target;
+    //                 train.last_station = curr_station_id;
+    //             }
+    //
+    //             return;
+    //         }
+    //     }
+    // }
 }
 
 #[derive(Resource)]
