@@ -8,7 +8,8 @@ use bevy_tweening::{AnimationSystem, Animator, Lens, Tween, component_animator_s
 use crate::{AppState, style};
 
 use super::{
-    ActiveLinesChanged, GameComponent,
+    GameComponent,
+    events::*,
     metro::{LINE_COLORS, Metro, MetroResources},
 };
 
@@ -22,7 +23,7 @@ pub fn plugin(app: &mut App) {
             Update,
             build_line_indicators
                 .run_if(in_state(AppState::Game))
-                .run_if(on_event::<ActiveLinesChanged>),
+                .run_if(on_event::<LinePathChanged>),
         )
         .add_systems(
             Update,
@@ -46,49 +47,49 @@ enum LineIndicatorState {
 }
 
 fn setup_ui(mut commands: Commands) {
-    commands.spawn((
-        Node {
-            width: Val::Px(150.0),
-            height: Val::Px(65.0),
-            justify_self: JustifySelf::Center,
-            align_self: AlignSelf::End,
-            ..default()
-        },
-        Children::spawn(SpawnWith(|parent: &mut ChildSpawner| {
-            parent
-                .spawn((
-                    Button,
-                    Node {
-                        width: Val::Px(150.0),
-                        height: Val::Px(65.0),
-                        border: UiRect::all(Val::Px(5.0)),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        ..default()
-                    },
-                    BorderColor(style::SECONDARY.into()),
-                    BorderRadius::MAX,
-                    BackgroundColor(style::CONTAINER_SECONDARY.into()),
-                    children![(
-                        Text::new("Test"),
-                        TextColor(style::ON_SECONDARY.into()),
-                        TextShadow::default(),
-                    )],
-                ))
-                .observe(
-                    |_: Trigger<Pointer<Click>>,
-                     mut events: EventWriter<ActiveLinesChanged>,
-                     mut metro_resources: ResMut<MetroResources>| {
-                        println!(
-                            "button clicked. metro lines: {}",
-                            metro_resources.available_lines
-                        );
-                        metro_resources.available_lines += 1;
-                        events.write(ActiveLinesChanged);
-                    },
-                );
-        })),
-    ));
+    // commands.spawn((
+    //     Node {
+    //         width: Val::Px(150.0),
+    //         height: Val::Px(65.0),
+    //         justify_self: JustifySelf::Center,
+    //         align_self: AlignSelf::End,
+    //         ..default()
+    //     },
+    //     Children::spawn(SpawnWith(|parent: &mut ChildSpawner| {
+    //         parent
+    //             .spawn((
+    //                 Button,
+    //                 Node {
+    //                     width: Val::Px(150.0),
+    //                     height: Val::Px(65.0),
+    //                     border: UiRect::all(Val::Px(5.0)),
+    //                     justify_content: JustifyContent::Center,
+    //                     align_items: AlignItems::Center,
+    //                     ..default()
+    //                 },
+    //                 BorderColor(style::SECONDARY.into()),
+    //                 BorderRadius::MAX,
+    //                 BackgroundColor(style::CONTAINER_SECONDARY.into()),
+    //                 children![(
+    //                     Text::new("Test"),
+    //                     TextColor(style::ON_SECONDARY.into()),
+    //                     TextShadow::default(),
+    //                 )],
+    //             ))
+    //             .observe(
+    //                 |_: Trigger<Pointer<Click>>,
+    //                  mut events: EventWriter<ActiveLinesChanged>,
+    //                  mut metro_resources: ResMut<MetroResources>| {
+    //                     println!(
+    //                         "button clicked. metro lines: {}",
+    //                         metro_resources.available_lines
+    //                     );
+    //                     metro_resources.available_lines += 1;
+    //                     events.write(ActiveLinesChanged);
+    //                 },
+    //             );
+    //     })),
+    // ));
 }
 
 fn build_line_indicators(

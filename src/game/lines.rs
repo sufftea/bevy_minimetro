@@ -4,7 +4,7 @@ use bevy::{
 
 use crate::utils::line_2d_plugin::*;
 
-use super::metro::{Connection, LINE_COLORS, LineId, Metro, MetroResources, Station, StationId};
+use super::{events::LinePathChanged, metro::{Connection, LineId, Metro, MetroResources, Station, StationId, LINE_COLORS}};
 
 const LINE_WIDTH: f32 = 2.;
 
@@ -13,8 +13,9 @@ pub(super) fn plugin(app: &mut App) {
         .insert_resource(LineDragState::None);
 }
 
+
 #[derive(Resource)]
-pub enum LineDragState {
+enum LineDragState {
     None,
     New {
         path: Vec<PathNode>,
@@ -35,7 +36,7 @@ pub enum LineDragState {
     // line_id: LineId,
 }
 
-pub struct PathNode {
+struct PathNode {
     start_station_id: StationId,
     end_station_id: Option<StationId>,
     line_entity: Entity,
@@ -61,22 +62,15 @@ pub struct StationLineDragTarget {
     pub station_id: StationId,
 }
 
-// #[derive(Component)]
-// struct MetroLine {
-//     line_id: LineId,
-//     stations: (StationId, StationId),
-// }
-
 #[derive(Component)]
 struct MetroLine {
     start_station_id: StationId,
-    /// None, if the user is currently dragging it to another station.
+    /// `None`, if the user is currently dragging it to another station.
     end_station_id: Option<StationId>,
     line_id: LineId,
 }
 
 fn on_line_handle_spawned(trigger: Trigger<OnAdd, LineDragHandle>, mut commands: Commands) {
-    println!("adding drag observers");
     commands.spawn(Observer::new(on_drag_start).with_entity(trigger.target()));
     commands.spawn(Observer::new(on_drag).with_entity(trigger.target()));
     commands.spawn(Observer::new(on_drag_end).with_entity(trigger.target()));
@@ -113,6 +107,7 @@ fn on_drag_start(
 
             let Some(new_line_id) = new_line_id else {
                 println!("now lines available");
+                *line_drag_state = LineDragState::None;
                 return;
             };
 
@@ -304,30 +299,56 @@ fn on_drag_end(
 
     camera_transform_q: Single<(&Camera, &GlobalTransform)>,
     mut drag_state: ResMut<LineDragState>,
-    mut metro: ResMut<Metro>,
+    // mut metro: ResMut<Metro>,
     metro_resources: Res<MetroResources>,
+
+    mut line_path_changed: EventWriter<LinePathChanged>,
 ) {
     match &mut *drag_state {
         LineDragState::None => {}
         LineDragState::New { path, line_id } => {
-            let Some(last_node) = path.last() else {
+            let Some(last_line) = path.last() else {
                 return;
             };
 
-            if let Ok((entity, metro_line, _)) = drag_data_q.get(last_node.line_entity) {
+            if let Ok((entity, metro_line, _)) = drag_data_q.get(last_line.line_entity) {
                 if metro_line.end_station_id.is_none() {
                     commands.entity(entity).despawn();
                 }
                 path.pop();
             }
 
-            for path_node in path {
-                let Some(end_station_id) = path_node.end_station_id else {
-                    continue;
+            // for path_node in path {
+            //     let Some(end_station_id) = path_node.end_station_id else {
+            //         continue;
+            //     };
+            //
+            //     // metro.add_connection(path_node.start_station_id, end_station_id, *line_id);
+            // }
+
+            if path.is_empty() {
+                line_path_changed.write(LinePathChanged {
+                    line_id: *line_id,
+                    new_path: Vec::new(),
+                });
+                return;
+            }
+
+            let mut new_path = Vec::with_capacity(path.len() + 1);
+            new_path.push(path[0].start_station_id);
+
+            for line in path {
+                let Some(end_station_id) = line.end_station_id else {
+                    panic!("one of the lines in the path doesn't contain `end_station_id`");
                 };
 
-                metro.add_connection(path_node.start_station_id, end_station_id, *line_id);
+                new_path.push(end_station_id);
             }
+
+            line_path_changed.write(LinePathChanged {
+                line_id: *line_id,
+                new_path,
+            });
         }
         LineDragState::Extend { path, line_id } => todo!(),
         LineDragState::Edit {

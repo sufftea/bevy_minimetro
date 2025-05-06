@@ -2,12 +2,18 @@ use std::f32::INFINITY;
 
 use rand::{Rng, rng};
 
+use bevy::prelude::*;
 use bevy::{
     color::Srgba,
     math::Vec2,
     platform::collections::HashSet,
     prelude::{Deref, Resource},
 };
+
+use crate::AppState;
+
+use super::events::LinePathChanged;
+
 
 pub const MAP_SIZE: Vec2 = Vec2::new(200., 200.);
 pub const LINE_COLORS: [Srgba; 10] = [
@@ -22,6 +28,26 @@ pub const LINE_COLORS: [Srgba; 10] = [
     Srgba::new(0.9, 0.8, 0.4, 1.0), // mellow yellow
     Srgba::new(0.6, 0.4, 0.9, 1.0), // soft violet
 ];
+
+pub(super) fn plugin(app: &mut App) {
+    app.insert_resource(Metro::new())
+        .insert_resource(MetroResources::new())
+        .add_systems(Update, on_line_path_changed.run_if(in_state(AppState::Game)));
+}
+
+pub fn on_line_path_changed(mut events: EventReader<LinePathChanged>, mut metro: ResMut<Metro>) {
+    for event in events.read() {
+        if event.new_path.is_empty() {
+            continue;
+        }
+
+        let previous_station_id = event.new_path[0];
+
+        for station_id in &event.new_path {
+            metro.add_connection(previous_station_id, *station_id, event.line_id);
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum StationKind {
