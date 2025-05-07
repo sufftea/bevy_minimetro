@@ -2,17 +2,18 @@ use bevy::{
     color::palettes::css::PURPLE, ecs::relationship::RelationshipSourceCollection, prelude::*,
 };
 
-use crate::utils::line_2d_plugin::*;
+use crate::game::lines_visual::MetroLineVisualBundle;
 
-use super::{events::LinePathChanged, metro::{Connection, LineId, Metro, MetroResources, Station, StationId, LINE_COLORS}};
-
-const LINE_WIDTH: f32 = 2.;
+use super::{
+    events::LinePathChanged,
+    lines_visual::MetroLineVisual,
+    metro::{Connection, LINE_COLORS, LineId, Metro, MetroResources, Station, StationId},
+};
 
 pub(super) fn plugin(app: &mut App) {
     app.add_observer(on_line_handle_spawned)
         .insert_resource(LineDragState::None);
 }
-
 
 #[derive(Resource)]
 enum LineDragState {
@@ -119,11 +120,9 @@ fn on_drag_start(
 
             let new_line_entity = commands
                 .spawn((
-                    // MetroLine { line_id: new_line_id, stations: () },
-                    Line2dBundle::new(
+                    MetroLineVisualBundle::new(
                         station.position,
                         drag_position,
-                        LINE_WIDTH,
                         LINE_COLORS[new_line_id].into(),
                     ),
                     MetroLine {
@@ -159,7 +158,7 @@ fn on_drag(
 
     mut commands: Commands,
 
-    mut lines_q: Query<(&mut MetroLine, &mut Line2dData)>,
+    mut lines_q: Query<(&mut MetroLine, &mut MetroLineVisual)>,
     stations_q: Query<&StationLineDragTarget>,
     camera_transform_q: Single<(&Camera, &GlobalTransform)>,
 
@@ -253,10 +252,9 @@ fn on_drag(
 
                         let new_line_entity = commands
                             .spawn((
-                                Line2dBundle::new(
+                                MetroLineVisualBundle::new(
                                     station.position,
                                     drag_position,
-                                    LINE_WIDTH,
                                     LINE_COLORS[*line_id].into(),
                                 ),
                                 MetroLine {
@@ -295,7 +293,7 @@ fn on_drag(
 fn on_drag_end(
     trigger: Trigger<Pointer<DragEnd>>,
     mut commands: Commands,
-    drag_data_q: Query<(Entity, &mut MetroLine, &mut Line2dData)>,
+    drag_data_q: Query<(Entity, &mut MetroLine, &mut MetroLineVisual)>,
 
     camera_transform_q: Single<(&Camera, &GlobalTransform)>,
     mut drag_state: ResMut<LineDragState>,
@@ -318,19 +316,7 @@ fn on_drag_end(
                 path.pop();
             }
 
-            // for path_node in path {
-            //     let Some(end_station_id) = path_node.end_station_id else {
-            //         continue;
-            //     };
-            //
-            //     // metro.add_connection(path_node.start_station_id, end_station_id, *line_id);
-            // }
-
             if path.is_empty() {
-                line_path_changed.write(LinePathChanged {
-                    line_id: *line_id,
-                    new_path: Vec::new(),
-                });
                 return;
             }
 
@@ -345,6 +331,7 @@ fn on_drag_end(
                 new_path.push(end_station_id);
             }
 
+            println!("sending linepathchanged event");
             line_path_changed.write(LinePathChanged {
                 line_id: *line_id,
                 new_path,

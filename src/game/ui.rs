@@ -23,7 +23,7 @@ pub fn plugin(app: &mut App) {
             Update,
             build_line_indicators
                 .run_if(in_state(AppState::Game))
-                .run_if(on_event::<LinePathChanged>),
+                .run_if(on_event::<ActiveLinesChanged>),
         )
         .add_systems(
             Update,

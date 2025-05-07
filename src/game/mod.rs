@@ -12,6 +12,7 @@ use bevy::color::palettes::basic as colors;
 
 pub mod events;
 pub mod lines;
+pub mod lines_visual;
 pub mod metro;
 pub mod stations;
 pub mod ui;
@@ -25,6 +26,7 @@ pub struct GameComponent;
 
 pub(super) fn plugin(app: &mut App) {
     app.add_plugins(lines::plugin)
+        .add_plugins(lines_visual::plugin)
         .add_plugins(ui::plugin)
         .add_plugins(stations::plugin)
         .add_plugins(metro::plugin)

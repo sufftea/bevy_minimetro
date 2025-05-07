@@ -1,41 +1,37 @@
 use bevy::prelude::*;
 
+const LINE_WIDTH: f32 = 2.;
+
 pub fn plugin(app: &mut App) {
     app.add_systems(Update, update_line_position);
 }
 
 #[derive(Component)]
-pub struct Line2dData {
+pub struct MetroLineVisual {
     pub start: Vec2,
     pub end: Vec2,
     pub color: Color,
-    pub width: f32,
 }
 
 #[derive(Bundle)]
-pub struct Line2dBundle {
-    pub data: Line2dData,
+pub struct MetroLineVisualBundle {
+    pub data: MetroLineVisual,
     pub transform: Transform,
     pub sprite: Sprite,
 }
 
-impl Line2dBundle {
-    pub fn new(start: Vec2, end: Vec2, width: f32, color: Color) -> Self {
+impl MetroLineVisualBundle {
+    pub fn new(start: Vec2, end: Vec2, color: Color) -> Self {
         let direction = end - start;
         let length = direction.length();
         let angle = direction.y.atan2(direction.x);
 
-        Line2dBundle {
-            data: Line2dData {
-                color,
-                end,
-                start,
-                width,
-            },
+        MetroLineVisualBundle {
+            data: MetroLineVisual { color, end, start },
             transform: Transform {
                 translation: ((start + end) / 2.0).extend(0.0),
                 rotation: Quat::from_rotation_z(angle),
-                scale: Vec3::new(length, width, 1.0),
+                scale: Vec3::new(length, LINE_WIDTH, 1.0),
                 // ..Default::default()
             },
             sprite: Sprite {
@@ -47,7 +43,7 @@ impl Line2dBundle {
 }
 
 fn update_line_position(
-    lines: Query<(&Line2dData, &mut Transform, &mut Sprite), Changed<Line2dData>>,
+    lines: Query<(&MetroLineVisual, &mut Transform, &mut Sprite), Changed<MetroLineVisual>>,
 ) {
     for (data, mut transform, mut sprite) in lines {
         let direction = data.end - data.start;
@@ -56,7 +52,7 @@ fn update_line_position(
 
         transform.translation = ((data.start + data.end) / 2.0).extend(0.0);
         transform.rotation = Quat::from_rotation_z(angle);
-        transform.scale = Vec3::new(length, data.width, 1.0);
+        transform.scale = Vec3::new(length, LINE_WIDTH, 1.0);
 
         sprite.color = data.color;
     }

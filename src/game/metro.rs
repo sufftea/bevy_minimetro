@@ -12,8 +12,7 @@ use bevy::{
 
 use crate::AppState;
 
-use super::events::LinePathChanged;
-
+use super::events::{ActiveLinesChanged, LinePathChanged};
 
 pub const MAP_SIZE: Vec2 = Vec2::new(200., 200.);
 pub const LINE_COLORS: [Srgba; 10] = [
@@ -32,11 +31,18 @@ pub const LINE_COLORS: [Srgba; 10] = [
 pub(super) fn plugin(app: &mut App) {
     app.insert_resource(Metro::new())
         .insert_resource(MetroResources::new())
-        .add_systems(Update, on_line_path_changed.run_if(in_state(AppState::Game)));
+        .add_systems(
+            Update,
+            on_line_path_changed.run_if(in_state(AppState::Game)),
+        );
 }
 
-pub fn on_line_path_changed(mut events: EventReader<LinePathChanged>, mut metro: ResMut<Metro>) {
-    for event in events.read() {
+pub fn on_line_path_changed(
+    mut line_path_changed_events: EventReader<LinePathChanged>,
+    mut active_lines_changed_events: EventWriter<ActiveLinesChanged>,
+    mut metro: ResMut<Metro>,
+) {
+    for event in line_path_changed_events.read() {
         if event.new_path.is_empty() {
             continue;
         }
@@ -46,15 +52,18 @@ pub fn on_line_path_changed(mut events: EventReader<LinePathChanged>, mut metro:
         for station_id in &event.new_path {
             metro.add_connection(previous_station_id, *station_id, event.line_id);
         }
+
+        active_lines_changed_events.write(ActiveLinesChanged);
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
-pub enum StationKind {
-    Square,
-    Triangle,
-    Circle,
-}
+pub type StationKind = usize;
+// #[derive(PartialEq, Eq, Clone, Copy)]
+// pub enum StationKind {
+//     Square,
+//     Triangle,
+//     Circle,
+// }
 
 #[derive(Clone, Copy, Deref)]
 pub struct Passenger {
@@ -82,8 +91,8 @@ impl Station {
         }
     }
 }
-
 pub type StationId = usize;
+
 pub type LineId = usize;
 
 pub struct Train {
@@ -130,9 +139,9 @@ impl Metro {
     pub fn new() -> Self {
         Metro {
             stations: vec![
-                Station::new(StationKind::Square, Vec2::new(-30., -20.)),
-                Station::new(StationKind::Triangle, Vec2::new(20., -20.)),
-                Station::new(StationKind::Circle, Vec2::new(-20., 40.)),
+                Station::new(0, Vec2::new(-30., -20.)),
+                Station::new(1, Vec2::new(20., -20.)),
+                Station::new(2, Vec2::new(-20., 40.)),
             ],
             connections: vec![vec![Vec::new(); 3]; 3],
             trains: Vec::new(),
@@ -192,9 +201,9 @@ impl Metro {
         );
 
         let kind = match rng.random() {
-            0.0..0.2 => StationKind::Square,
-            ..0.5 => StationKind::Triangle,
-            _ => StationKind::Circle,
+            0.0..0.2 => 0,
+            ..0.5 => 1,
+            _ => 2,
         };
 
         let intensity = rng.random_range(0.1..=0.2);
@@ -211,9 +220,9 @@ impl Metro {
             if rng.random::<f32>() < station.intensity {
                 station.passengers.push(Passenger {
                     target: match rng.random_range(0..3) {
-                        0 => StationKind::Circle,
-                        1 => StationKind::Triangle,
-                        _ => StationKind::Square,
+                        0 => 2,
+                        1 => 1,
+                        _ => 0,
                     },
                 });
             }
